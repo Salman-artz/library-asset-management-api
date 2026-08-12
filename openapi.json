@@ -1,0 +1,1209 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Library & Asset Management API",
+    "description": "REST API untuk sistem manajemen perpustakaan/aset berbasis PHP (Laravel). Mencakup autentikasi, manajemen koleksi, peminjaman-pengembalian, perhitungan denda otomatis, reminder email via queue, dan laporan statistik.\n\nRole & Hak Akses:\n- Admin: Full access - kelola staff, koleksi, kategori, laporan\n- Staff: Kelola koleksi, proses peminjaman/pengembalian, denda\n- Member: Lihat katalog, riwayat & status peminjaman sendiri\n\nAturan Bisnis:\n- Maksimal 3 peminjaman aktif per member\n- Jatuh tempo otomatis: 7 hari dari tanggal pinjam\n- Denda keterlambatan: Rp 3.000/hari\n- Member dengan denda belum dibayar tidak bisa meminjam\n- Stok menggunakan database transaction (lockForUpdate)",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Masukkan token dari login. Format: Bearer {token}"
+      }
+    },
+    "schemas": {
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string" },
+          "data": { "nullable": true }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [false] },
+          "message": { "type": "string" },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "current_page": { "type": "integer" },
+          "data": { "type": "array", "items": { "type": "object" } },
+          "first_page_url": { "type": "string" },
+          "from": { "type": "integer", "nullable": true },
+          "last_page": { "type": "integer" },
+          "last_page_url": { "type": "string" },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": { "type": "string", "nullable": true },
+                "label": { "type": "string" },
+                "active": { "type": "boolean" }
+              }
+            }
+          },
+          "next_page_url": { "type": "string", "nullable": true },
+          "path": { "type": "string" },
+          "per_page": { "type": "integer" },
+          "prev_page_url": { "type": "string", "nullable": true },
+          "to": { "type": "integer", "nullable": true },
+          "total": { "type": "integer" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "name": { "type": "string", "example": "Member Satu" },
+          "email": { "type": "string", "format": "email", "example": "member1@library.test" },
+          "role": { "type": "string", "enum": ["admin", "staff", "member"], "example": "member" },
+          "email_verified_at": { "type": "string", "format": "date-time", "nullable": true, "example": "2026-07-28T06:20:05.000000Z" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AuthData": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/User" },
+          "token_type": { "type": "string", "example": "Bearer" },
+          "access_token": { "type": "string", "example": "1|n5UUQMELVRBuUaC8JWV53eCYy7f0Cje3wOfjyu1ze5823547" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["name", "email", "password", "password_confirmation"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 255, "example": "Member Baru" },
+          "email": { "type": "string", "format": "email", "maxLength": 255, "example": "memberbaru@library.test" },
+          "password": { "type": "string", "format": "password", "minLength": 8, "description": "Minimal 8 karakter, huruf besar, huruf kecil, dan angka", "example": "Password123" },
+          "password_confirmation": { "type": "string", "format": "password", "example": "Password123" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "example": "member1@library.test" },
+          "password": { "type": "string", "format": "password", "example": "password" }
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 255, "example": "Nama Baru" },
+          "email": { "type": "string", "format": "email", "maxLength": 255, "example": "emailbaru@library.test" }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "example": "member1@library.test" }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": ["token", "email", "password", "password_confirmation"],
+        "properties": {
+          "token": { "type": "string", "description": "Token dari email reset password", "example": "reset-token-from-email" },
+          "email": { "type": "string", "format": "email", "example": "member1@library.test" },
+          "password": { "type": "string", "format": "password", "minLength": 8, "example": "PasswordBaru123" },
+          "password_confirmation": { "type": "string", "format": "password", "example": "PasswordBaru123" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "name": { "type": "string", "example": "Teknologi Informasi" },
+          "collections_count": { "type": "integer", "example": 2, "description": "Jumlah koleksi dalam kategori" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "StoreCategoryRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 255, "example": "Kategori Baru" }
+        }
+      },
+      "UpdateCategoryRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 255, "example": "Kategori Diperbarui" }
+        }
+      },
+      "Collection": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "code": { "type": "string", "example": "COL-IT-001" },
+          "title": { "type": "string", "example": "Laravel dari Dasar ke Produksi" },
+          "category": { "$ref": "#/components/schemas/Category" },
+          "cover_image_url": { "type": "string", "format": "uri", "nullable": true, "example": "http://localhost:8000/storage/collections/covers/sample.jpg" },
+          "total_stock": { "type": "integer", "example": 8 },
+          "available_stock": { "type": "integer", "example": 6 },
+          "condition": { "type": "string", "enum": ["good", "fair", "damaged"], "example": "good" },
+          "status": { "type": "string", "enum": ["available", "borrowed", "maintenance", "lost"], "example": "available" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "StoreCollectionRequest": {
+        "type": "object",
+        "required": ["code", "title", "category_id", "total_stock", "condition", "status"],
+        "properties": {
+          "code": { "type": "string", "maxLength": 50, "example": "COL-NEW-001" },
+          "title": { "type": "string", "maxLength": 255, "example": "Judul Koleksi Baru" },
+          "category_id": { "type": "integer", "example": 1 },
+          "cover_image": { "type": "string", "format": "binary", "description": "File gambar (jpeg/png/jpg/webp) maks 2MB" },
+          "total_stock": { "type": "integer", "minimum": 0, "example": 5 },
+          "condition": { "type": "string", "enum": ["good", "fair", "damaged"], "example": "good" },
+          "status": { "type": "string", "enum": ["available", "borrowed", "maintenance", "lost"], "example": "available" }
+        }
+      },
+      "UpdateCollectionRequest": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "maxLength": 50, "example": "COL-UPD-001" },
+          "title": { "type": "string", "maxLength": 255, "example": "Judul Diperbarui" },
+          "category_id": { "type": "integer", "example": 2 },
+          "cover_image": { "type": "string", "format": "binary", "description": "File gambar baru (mengganti gambar lama)" },
+          "total_stock": { "type": "integer", "minimum": 0, "example": 10 },
+          "available_stock": { "type": "integer", "minimum": 0, "example": 8 },
+          "condition": { "type": "string", "enum": ["good", "fair", "damaged"], "example": "fair" },
+          "status": { "type": "string", "enum": ["available", "borrowed", "maintenance", "lost"], "example": "available" }
+        }
+      },
+      "Borrowing": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 3 },
+          "user": { "$ref": "#/components/schemas/User" },
+          "collection": { "$ref": "#/components/schemas/Collection" },
+          "borrowed_at": { "type": "string", "format": "date-time", "example": "2026-07-28T13:31:06.000000Z" },
+          "due_date": { "type": "string", "format": "date", "example": "2026-08-04" },
+          "returned_at": { "type": "string", "format": "date-time", "nullable": true, "example": null },
+          "status": { "type": "string", "enum": ["borrowed", "returned", "overdue", "cancelled"], "example": "borrowed" },
+          "fine": { "nullable": true, "oneOf": [{ "$ref": "#/components/schemas/Fine" }, { "type": "null" }] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "StoreBorrowingRequest": {
+        "type": "object",
+        "required": ["collection_id", "user_id"],
+        "properties": {
+          "collection_id": { "type": "integer", "example": 2, "description": "ID koleksi yang ingin dipinjam" },
+          "user_id": { "type": "integer", "example": 4, "description": "ID member peminjam. Staff/Admin bisa menentukan member lain. Member akan diabaikan, menggunakan ID sendiri." }
+        }
+      },
+      "Fine": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "borrowing": { "$ref": "#/components/schemas/Borrowing" },
+          "amount": { "type": "number", "format": "double", "example": 15000.00, "description": "Total denda = days_late x daily_rate" },
+          "days_late": { "type": "integer", "example": 5 },
+          "daily_rate": { "type": "number", "format": "double", "example": 3000.00 },
+          "status": { "type": "string", "enum": ["unpaid", "paid"], "example": "unpaid" },
+          "paid_at": { "type": "string", "format": "date-time", "nullable": true, "example": null },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ExportRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "member": { "type": "string", "example": "Member Satu" },
+          "collection": { "type": "string", "example": "Laravel dari Dasar ke Produksi" },
+          "borrowed_at": { "type": "string", "format": "date-time" },
+          "due_date": { "type": "string", "format": "date" },
+          "returned_at": { "type": "string", "format": "date-time", "nullable": true },
+          "status": { "type": "string" },
+          "fine_amount": { "type": "number", "example": 0 },
+          "fine_status": { "type": "string", "example": "-" }
+        }
+      },
+      "ExportData": {
+        "type": "object",
+        "properties": {
+          "total_records": { "type": "integer", "example": 10 },
+          "records": { "type": "array", "items": { "$ref": "#/components/schemas/ExportRecord" } }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Autentikasi"],
+        "summary": "Registrasi member baru",
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registrasi berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Registrasi berhasil" },
+                        "data": { "$ref": "#/components/schemas/AuthData" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validasi gagal",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Autentikasi"],
+        "summary": "Login pengguna",
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Login berhasil" },
+                        "data": { "$ref": "#/components/schemas/AuthData" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Email atau password salah",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Autentikasi"],
+        "summary": "Logout",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "Logout berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "message": { "example": "Logout berhasil" }, "data": { "type": "null" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Autentikasi"],
+        "summary": "Lihat profil sendiri",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "Profil berhasil didapatkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Profil pengguna" },
+                        "data": {
+                          "type": "object",
+                          "properties": { "user": { "$ref": "#/components/schemas/User" } }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" }
+        }
+      }
+    },
+    "/auth/profile": {
+      "patch": {
+        "tags": ["Autentikasi"],
+        "summary": "Update profil",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "updateProfile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateProfileRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profil berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "message": { "example": "Profil berhasil diperbarui" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "tags": ["Autentikasi"],
+        "summary": "Kirim link reset password",
+        "operationId": "forgotPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ForgotPasswordRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email reset password terkirim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "message": { "example": "Password reset link sent!" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "tags": ["Autentikasi"],
+        "summary": "Reset password",
+        "operationId": "resetPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ResetPasswordRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password berhasil direset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" }
+                  ]
+                }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": ["Kategori"],
+        "summary": "Daftar kategori",
+        "operationId": "listCategories",
+        "parameters": [
+          { "name": "search", "in": "query", "description": "Cari berdasarkan nama", "schema": { "type": "string" }, "example": "Teknologi" },
+          { "name": "per_page", "in": "query", "description": "Jumlah per halaman", "schema": { "type": "integer", "default": 20 }, "example": 10 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar kategori",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "data": { "$ref": "#/components/schemas/Pagination" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Kategori"],
+        "summary": "Tambah kategori",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "createCategory",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StoreCategoryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kategori berhasil dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Kategori berhasil dibuat" },
+                        "data": { "$ref": "#/components/schemas/Category" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "tags": ["Kategori"],
+        "summary": "Detail kategori",
+        "operationId": "showCategory",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail kategori",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "data": { "$ref": "#/components/schemas/Category" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Kategori"],
+        "summary": "Update kategori",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "updateCategory",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateCategoryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kategori berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Kategori berhasil diperbarui" },
+                        "data": { "$ref": "#/components/schemas/Category" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      },
+      "delete": {
+        "tags": ["Kategori"],
+        "summary": "Hapus kategori",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "deleteCategory",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kategori berhasil dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "message": { "example": "Kategori berhasil dihapus" }, "data": { "type": "null" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/collections": {
+      "get": {
+        "tags": ["Koleksi"],
+        "summary": "Daftar koleksi (katalog)",
+        "operationId": "listCollections",
+        "parameters": [
+          { "name": "search", "in": "query", "description": "Cari berdasarkan judul atau kode", "schema": { "type": "string" }, "example": "Laravel" },
+          { "name": "category_id", "in": "query", "description": "Filter kategori", "schema": { "type": "integer" }, "example": 1 },
+          { "name": "status", "in": "query", "description": "Filter status", "schema": { "type": "string", "enum": ["available", "borrowed", "maintenance", "lost"] }, "example": "available" },
+          { "name": "condition", "in": "query", "description": "Filter kondisi", "schema": { "type": "string", "enum": ["good", "fair", "damaged"] }, "example": "good" },
+          { "name": "per_page", "in": "query", "description": "Jumlah per halaman", "schema": { "type": "integer", "default": 12 }, "example": 10 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar koleksi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "data": { "$ref": "#/components/schemas/Pagination" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Koleksi"],
+        "summary": "Tambah koleksi",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "createCollection",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": { "$ref": "#/components/schemas/StoreCollectionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Koleksi berhasil ditambahkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Koleksi berhasil ditambahkan" },
+                        "data": { "$ref": "#/components/schemas/Collection" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/collections/{id}": {
+      "get": {
+        "tags": ["Koleksi"],
+        "summary": "Detail koleksi",
+        "operationId": "showCollection",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail koleksi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "data": { "$ref": "#/components/schemas/Collection" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Koleksi"],
+        "summary": "Update koleksi",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "updateCollection",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": { "$ref": "#/components/schemas/UpdateCollectionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Koleksi berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Koleksi berhasil diperbarui" },
+                        "data": { "$ref": "#/components/schemas/Collection" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      },
+      "delete": {
+        "tags": ["Koleksi"],
+        "summary": "Hapus koleksi",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "deleteCollection",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Koleksi berhasil dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "message": { "example": "Koleksi berhasil dihapus" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/borrowings": {
+      "get": {
+        "tags": ["Peminjaman"],
+        "summary": "Daftar peminjaman",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "listBorrowings",
+        "parameters": [
+          { "name": "status", "in": "query", "description": "Filter status", "schema": { "type": "string", "enum": ["borrowed", "returned", "overdue", "cancelled"] } },
+          { "name": "user_id", "in": "query", "description": "Filter user (Staff/Admin only)", "schema": { "type": "integer" } },
+          { "name": "per_page", "in": "query", "description": "Jumlah per halaman", "schema": { "type": "integer", "default": 15 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar peminjaman",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "data": { "$ref": "#/components/schemas/Pagination" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" }
+        }
+      },
+      "post": {
+        "tags": ["Peminjaman"],
+        "summary": "Catat peminjaman baru",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "storeBorrowing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StoreBorrowingRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Peminjaman berhasil dicatat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Peminjaman berhasil dicatat" },
+                        "data": { "$ref": "#/components/schemas/Borrowing" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/borrowings/{id}": {
+      "get": {
+        "tags": ["Peminjaman"],
+        "summary": "Detail peminjaman",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "showBorrowing",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail peminjaman",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "data": { "$ref": "#/components/schemas/Borrowing" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/borrowings/{id}/return": {
+      "patch": {
+        "tags": ["Peminjaman"],
+        "summary": "Proses pengembalian",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "returnBorrowing",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Koleksi berhasil dikembalikan. Jika telat akan ada denda.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Koleksi berhasil dikembalikan dengan denda keterlambatan." },
+                        "data": { "$ref": "#/components/schemas/Borrowing" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/fines": {
+      "get": {
+        "tags": ["Denda"],
+        "summary": "Daftar denda",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "listFines",
+        "parameters": [
+          { "name": "status", "in": "query", "description": "Filter status", "schema": { "type": "string", "enum": ["unpaid", "paid"] } },
+          { "name": "user_id", "in": "query", "description": "Filter user", "schema": { "type": "integer" } },
+          { "name": "per_page", "in": "query", "description": "Jumlah per halaman", "schema": { "type": "integer", "default": 15 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar denda",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "data": { "$ref": "#/components/schemas/Pagination" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/fines/{id}": {
+      "get": {
+        "tags": ["Denda"],
+        "summary": "Detail denda",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "showFine",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail denda",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "data": { "$ref": "#/components/schemas/Fine" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/fines/{id}/pay": {
+      "patch": {
+        "tags": ["Denda"],
+        "summary": "Catat pembayaran denda",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "payFine",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pembayaran berhasil dicatat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Pembayaran denda berhasil dicatat" },
+                        "data": { "$ref": "#/components/schemas/Fine" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/reports/popular-collections": {
+      "get": {
+        "tags": ["Laporan"],
+        "summary": "Koleksi paling sering dipinjam",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "popularCollections",
+        "parameters": [
+          { "name": "limit", "in": "query", "description": "Jumlah koleksi", "schema": { "type": "integer", "default": 10 }, "example": 5 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar koleksi populer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "message": { "example": "Koleksi paling sering dipinjam" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/reports/active-members": {
+      "get": {
+        "tags": ["Laporan"],
+        "summary": "Member paling aktif meminjam",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "activeMembers",
+        "parameters": [
+          { "name": "limit", "in": "query", "description": "Jumlah member", "schema": { "type": "integer", "default": 10 }, "example": 5 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar member aktif",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    { "properties": { "message": { "example": "Member paling aktif meminjam" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/reports/export": {
+      "get": {
+        "tags": ["Laporan"],
+        "summary": "Export laporan peminjaman",
+        "security": [{ "bearerAuth": [] }],
+        "operationId": "exportReport",
+        "parameters": [
+          { "name": "start_date", "in": "query", "description": "Filter tanggal mulai (Y-m-d)", "schema": { "type": "string", "format": "date" }, "example": "2026-01-01" },
+          { "name": "end_date", "in": "query", "description": "Filter tanggal akhir (Y-m-d)", "schema": { "type": "string", "format": "date" }, "example": "2026-12-31" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data laporan peminjaman",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SuccessResponse" },
+                    {
+                      "properties": {
+                        "message": { "example": "Laporan peminjaman" },
+                        "data": { "$ref": "#/components/schemas/ExportData" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    }
+  },
+  "responses": {
+    "Unauthenticated": {
+      "description": "Unauthenticated - token tidak valid atau tidak disertakan",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean", "enum": [false] },
+              "message": { "type": "string", "example": "Unauthenticated." }
+            }
+          }
+        }
+      }
+    },
+    "Forbidden": {
+      "description": "Forbidden - tidak memiliki akses",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean", "enum": [false] },
+              "message": { "type": "string", "example": "Anda tidak memiliki akses ke resource ini." }
+            }
+          }
+        }
+      }
+    },
+    "NotFound": {
+      "description": "Resource tidak ditemukan",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean", "enum": [false] },
+              "message": { "type": "string", "example": "Resource not found." }
+            }
+          }
+        }
+      }
+    },
+    "Conflict": {
+      "description": "Conflict - resource masih terkait dengan data lain",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean", "enum": [false] },
+              "message": { "type": "string", "example": "Data masih memiliki relasi dengan data lain." }
+            }
+          }
+        }
+      }
+    },
+    "ValidationError": {
+      "description": "Validasi gagal",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean", "enum": [false] },
+              "message": { "type": "string", "example": "Validasi gagal." },
+              "errors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
