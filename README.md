@@ -4,6 +4,24 @@ Backend REST API untuk mengelola koleksi perpustakaan, aset institusi, peminjama
 
 Project ini cocok untuk perpustakaan, institusi pendidikan, museum, atau organisasi yang membutuhkan katalog dan alur peminjaman terstruktur.
 
+---
+
+## 📸 Antarmuka Sirkulasi Peminjaman & Tracking Aset Fisik
+
+<p align="center">
+  <img src="screenshots/foto2_sirkulasi_peminjaman_denda.png" alt="Sirkulasi Peminjaman dan Denda" width="90%" />
+  <br/>
+  <em>Manajemen Transaksi Sirkulasi Peminjaman Buku, Status Jatuh Tempo, dan Denda Otomatis</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/foto3_tracking_aset_fisik.png" alt="Tracking Aset Fisik" width="90%" />
+  <br/>
+  <em>Inventarisasi Aset Fisik Institusi: Barcode Alat, Kondisi Barang, dan Lokasi Penempatan</em>
+</p>
+
+---
+
 ## Fitur
 
 - Register, login, logout, profile, dan reset password
