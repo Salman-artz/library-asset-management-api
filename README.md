@@ -9,15 +9,21 @@ Project ini cocok untuk perpustakaan, institusi pendidikan, museum, atau organis
 ## 📸 Antarmuka Sirkulasi Peminjaman & Tracking Aset Fisik
 
 <p align="center">
-  <img src="screenshots/foto2_sirkulasi_peminjaman_denda.png" alt="Sirkulasi Peminjaman dan Denda" width="90%" />
+  <img src="screenshots/02_dashboard_light.png" alt="Enterprise Dashboard" width="90%" />
+  <br/>
+  <em>Enterprise Dashboard — Arsitektur Sage Forest & Warm Sand dengan Metrik Sirkulasi Real-time</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/07_borrowings_sirkulasi.png" alt="Sirkulasi Peminjaman dan Denda" width="90%" />
   <br/>
   <em>Manajemen Transaksi Sirkulasi Peminjaman Buku, Status Jatuh Tempo, dan Denda Otomatis</em>
 </p>
 
 <p align="center">
-  <img src="screenshots/foto3_tracking_aset_fisik.png" alt="Tracking Aset Fisik" width="90%" />
+  <img src="screenshots/12_surat_bebas_pustaka_official.png" alt="Surat Bebas Pustaka Resmi" width="90%" />
   <br/>
-  <em>Inventarisasi Aset Fisik Institusi: Barcode Alat, Kondisi Barang, dan Lokasi Penempatan</em>
+  <em>Penerbitan Surat Keterangan Bebas Perpustakaan Resmi dengan Validasi Digital QR & Tanda Tangan</em>
 </p>
 
 ---
@@ -78,7 +84,7 @@ Edit `.env` sesuai koneksi database:
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=library_asset_db
+DB_DATABASE=library_aset_manajemen_db
 DB_USERNAME=root
 DB_PASSWORD=
 ```
