@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
-use App\Repositories\UserRepository;
+use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 class AuthService
 {
     public function __construct(
-        private readonly UserRepository $users
+        private readonly UserRepositoryInterface $users
     ) {}
 
     public function register(array $data): array
