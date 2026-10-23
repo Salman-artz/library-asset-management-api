@@ -2,10 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin \App\Models\User */
+/** @mixin User */
 class UserResource extends JsonResource
 {
     /**
@@ -21,7 +22,7 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'role' => $this->role,
             'avatar_path' => $this->avatar_path,
-            'avatar_url' => $this->avatar_path ? asset('storage/' . $this->avatar_path) : null,
+            'avatar_url' => $this->avatar_path ? asset('storage/'.$this->avatar_path) : null,
             'borrowings_count' => $this->when(isset($this->borrowings_count), $this->borrowings_count),
             'email_verified_at' => $this->email_verified_at,
             'created_at' => $this->created_at,

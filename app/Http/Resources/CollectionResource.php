@@ -2,10 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Models\LibraryCollection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin \App\Models\LibraryCollection */
+/** @mixin LibraryCollection */
 class CollectionResource extends JsonResource
 {
     public function toArray(Request $request): array
@@ -18,7 +19,7 @@ class CollectionResource extends JsonResource
             'category' => new CategoryResource($this->whenLoaded('category')),
             'cover_image_path' => $this->cover_image_path,
             'cover_image_url' => $this->cover_image_path
-                ? asset('storage/' . $this->cover_image_path)
+                ? asset('storage/'.$this->cover_image_path)
                 : null,
             'total_stock' => $this->total_stock,
             'available_stock' => $this->available_stock,
@@ -30,4 +31,3 @@ class CollectionResource extends JsonResource
         ];
     }
 }
-

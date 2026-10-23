@@ -7,13 +7,13 @@ use App\Http\Requests\Auth\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use App\Support\ApiResponse;
+use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
     public function __construct(
         private readonly AuthService $authService
-    ) {
-    }
+    ) {}
 
     public function update(UpdateProfileRequest $request)
     {
@@ -22,7 +22,7 @@ class ProfileController extends Controller
         if ($request->hasFile('avatar')) {
             $user = $request->user();
             if ($user->avatar_path) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar_path);
+                Storage::disk('public')->delete($user->avatar_path);
             }
             $data['avatar_path'] = $request->file('avatar')->store('users/avatars', 'public');
         }

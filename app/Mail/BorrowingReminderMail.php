@@ -16,8 +16,7 @@ class BorrowingReminderMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public Borrowing $borrowing
-    ) {
-    }
+    ) {}
 
     public function envelope(): Envelope
     {
@@ -56,4 +55,3 @@ class BorrowingReminderMail extends Mailable implements ShouldQueue
         );
     }
 }
-

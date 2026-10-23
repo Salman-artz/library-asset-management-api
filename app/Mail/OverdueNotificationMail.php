@@ -16,8 +16,7 @@ class OverdueNotificationMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public Borrowing $borrowing
-    ) {
-    }
+    ) {}
 
     public function envelope(): Envelope
     {
@@ -60,4 +59,3 @@ class OverdueNotificationMail extends Mailable implements ShouldQueue
         );
     }
 }
-

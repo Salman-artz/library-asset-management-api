@@ -75,4 +75,3 @@ class SendBorrowingReminders implements ShouldQueue
         }
     }
 }
-

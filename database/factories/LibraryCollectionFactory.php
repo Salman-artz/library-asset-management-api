@@ -19,7 +19,7 @@ class LibraryCollectionFactory extends Factory
         $totalStock = fake()->numberBetween(3, 15);
 
         return [
-            'code' => 'COL-' . strtoupper(Str::random(8)),
+            'code' => 'COL-'.strtoupper(Str::random(8)),
             'title' => fake()->unique()->sentence(3),
             'category_id' => Category::factory(),
             'cover_image_path' => null,

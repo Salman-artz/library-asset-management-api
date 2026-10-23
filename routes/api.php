@@ -56,7 +56,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 // === Fine Routes ===
 Route::middleware(['auth:sanctum'])->group(function (): void {
     Route::get('fines/mine', [FineController::class, 'mine']);
-    
+
     Route::middleware(['role:admin,staff'])->group(function (): void {
         Route::get('fines', [FineController::class, 'index']);
         Route::get('fines/{fine}', [FineController::class, 'show']);

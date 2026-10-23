@@ -14,8 +14,7 @@ class BorrowingController extends Controller
 {
     public function __construct(
         private readonly BorrowingService $borrowingService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -91,4 +90,3 @@ class BorrowingController extends Controller
         }
     }
 }
-

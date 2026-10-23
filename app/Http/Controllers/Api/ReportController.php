@@ -5,24 +5,20 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CollectionResource;
 use App\Http\Resources\UserResource;
-use App\Models\Borrowing;
-use App\Models\LibraryCollection;
-use App\Models\User;
+use App\Services\ReportService;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
+    public function __construct(
+        private readonly ReportService $reportService
+    ) {}
+
     public function popularCollections(Request $request)
     {
-        $limit = $request->input('limit', 10);
-
-        $collections = LibraryCollection::query()
-            ->withCount('borrowings')
-            ->with('category')
-            ->orderBy('borrowings_count', 'desc')
-            ->limit($limit)
-            ->get();
+        $limit = (int) $request->input('limit', 10);
+        $collections = $this->reportService->getPopularCollections($limit);
 
         return ApiResponse::success(
             CollectionResource::collection($collections),
@@ -32,14 +28,8 @@ class ReportController extends Controller
 
     public function activeMembers(Request $request)
     {
-        $limit = $request->input('limit', 10);
-
-        $members = User::query()
-            ->where('role', User::ROLE_MEMBER)
-            ->withCount('borrowings')
-            ->orderBy('borrowings_count', 'desc')
-            ->limit($limit)
-            ->get();
+        $limit = (int) $request->input('limit', 10);
+        $members = $this->reportService->getActiveMembers($limit);
 
         return ApiResponse::success(
             UserResource::collection($members),
@@ -49,40 +39,26 @@ class ReportController extends Controller
 
     public function export(Request $request)
     {
-        $query = Borrowing::query()
-            ->with(['user', 'collection.category', 'fine']);
-
-        if ($request->start_date) {
-            $query->whereDate('borrowed_at', '>=', $request->start_date);
-        }
-
-        if ($request->end_date) {
-            $query->whereDate('borrowed_at', '<=', $request->end_date);
-        }
-
-        $borrowings = $query->orderBy('borrowed_at', 'desc')->get();
+        $borrowings = $this->reportService->getExportData(
+            $request->start_date,
+            $request->end_date
+        );
 
         $data = $borrowings->map(fn ($b) => [
             'id' => $b->id,
-            'member' => $b->user->name,
-            'collection' => $b->collection->title,
-            'borrowed_at' => $b->borrowed_at->toDateTimeString(),
-            'due_date' => $b->due_date,
-            'returned_at' => $b->returned_at?->toDateTimeString(),
+            'user_name' => $b->user?->name,
+            'user_email' => $b->user?->email,
+            'collection_code' => $b->collection?->code,
+            'collection_title' => $b->collection?->title,
+            'category' => $b->collection?->category?->name,
+            'borrowed_at' => $b->borrowed_at?->toISOString(),
+            'due_date' => $b->due_date?->toISOString(),
+            'returned_at' => $b->returned_at?->toISOString(),
             'status' => $b->status,
-            'fine_amount' => $b->fine?->amount ?? 0,
-            'fine_status' => $b->fine?->status ?? '-',
+            'fine_amount' => $b->fine?->amount,
+            'fine_status' => $b->fine?->status,
         ]);
 
-        if ($request->format === 'pdf') {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.borrowings', ['data' => $data]);
-            return $pdf->download('laporan-peminjaman.pdf');
-        }
-
-        return ApiResponse::success([
-            'total_records' => $data->count(),
-            'records' => $data,
-        ], 'Laporan peminjaman');
+        return ApiResponse::success($data, 'Data sirkulasi perpustakaan berhasil diekspor');
     }
 }
-

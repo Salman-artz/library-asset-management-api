@@ -12,8 +12,7 @@ class PasswordResetController extends Controller
 {
     public function __construct(
         private readonly AuthService $authService
-    ) {
-    }
+    ) {}
 
     public function sendResetLinkEmail(ForgotPasswordRequest $request)
     {

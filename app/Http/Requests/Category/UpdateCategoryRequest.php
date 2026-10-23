@@ -21,4 +21,3 @@ class UpdateCategoryRequest extends FormRequest
         ];
     }
 }
-

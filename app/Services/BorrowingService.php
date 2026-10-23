@@ -12,7 +12,9 @@ use Illuminate\Support\Facades\DB;
 class BorrowingService
 {
     private const MAX_ACTIVE_BORROWINGS = 3;
+
     private const DEFAULT_LOAN_DAYS = 7;
+
     private const DAILY_FINE_RATE = 3000;
 
     public function borrow(int $collectionId, int $userId): Borrowing
@@ -37,7 +39,7 @@ class BorrowingService
 
             if ($activeBorrowings >= self::MAX_ACTIVE_BORROWINGS) {
                 throw new \RuntimeException(
-                    'Member sudah mencapai batas maksimal peminjaman (' . self::MAX_ACTIVE_BORROWINGS . ').'
+                    'Member sudah mencapai batas maksimal peminjaman ('.self::MAX_ACTIVE_BORROWINGS.').'
                 );
             }
 
@@ -145,4 +147,3 @@ class BorrowingService
             ->paginate($filters['per_page'] ?? 15);
     }
 }
-

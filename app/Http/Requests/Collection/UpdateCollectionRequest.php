@@ -28,4 +28,3 @@ class UpdateCollectionRequest extends FormRequest
         ];
     }
 }
-
