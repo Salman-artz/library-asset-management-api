@@ -1,64 +1,57 @@
-# Library & Asset Management API
+# PUSTAKA SENTRAL — Integrated Library Management REST API (Backend)
 
-Backend REST API untuk mengelola koleksi perpustakaan, aset institusi, peminjaman, pengembalian, denda, anggota, dan laporan. Project dibangun menggunakan Laravel 13, PHP 8.3, Eloquent ORM, dan MySQL atau MariaDB.
-
-Project ini cocok untuk perpustakaan, institusi pendidikan, museum, atau organisasi yang membutuhkan katalog dan alur peminjaman terstruktur.
+Backend REST API untuk sistem informasi perpustakaan terpadu, mengelola koleksi buku, sirkulasi peminjaman, pengembalian, kalkulasi denda otomatis, analitik buku terpopuler, anggota perpustakaan, dan penerbitan surat bebas pustaka resmi. Dibangun menggunakan Laravel 13, PHP 8.3, Eloquent ORM, dan MySQL/MariaDB.
 
 ---
 
-## 📸 Antarmuka Sirkulasi Peminjaman & Tracking Aset Fisik
+## 📸 Antarmuka Sistem & Sirkulasi Pustaka
 
 <p align="center">
-  <img src="screenshots/02_dashboard_light.png" alt="Enterprise Dashboard" width="90%" />
+  <img src="screenshots/25_dashboard_chart_final.png" alt="Pustaka Sentral Dashboard & Chart Analitik" width="92%" />
   <br/>
-  <em>Enterprise Dashboard — Arsitektur Sage Forest & Warm Sand dengan Metrik Sirkulasi Real-time</em>
+  <em>Dashboard Pustaka Sentral — Lengkap dengan Fitur Chart Analitik Buku Paling Sering Dipinjam</em>
 </p>
 
 <p align="center">
-  <img src="screenshots/07_borrowings_sirkulasi.png" alt="Sirkulasi Peminjaman dan Denda" width="90%" />
+  <img src="screenshots/07_borrowings_sirkulasi.png" alt="Sirkulasi Peminjaman dan Denda" width="92%" />
   <br/>
   <em>Manajemen Transaksi Sirkulasi Peminjaman Buku, Status Jatuh Tempo, dan Denda Otomatis</em>
 </p>
 
 <p align="center">
-  <img src="screenshots/12_surat_bebas_pustaka_official.png" alt="Surat Bebas Pustaka Resmi" width="90%" />
+  <img src="screenshots/12_surat_bebas_pustaka_official.png" alt="Surat Bebas Pustaka Resmi" width="92%" />
   <br/>
   <em>Penerbitan Surat Keterangan Bebas Perpustakaan Resmi dengan Validasi Digital QR & Tanda Tangan</em>
 </p>
 
 ---
 
-## Fitur
+## Fitur Utama Backend
 
-- Register, login, logout, profile, dan reset password
-- Autentikasi API menggunakan Laravel Sanctum
-- Role-based access untuk Admin, Staff, dan Member
-- CRUD kategori koleksi
-- CRUD koleksi atau aset dengan katalog publik
-- Peminjaman dan pengembalian koleksi
-- Perhitungan dan pembayaran denda
-- Database transaction untuk menjaga ketersediaan koleksi
-- Soft delete dan audit-friendly data management
-- Email reminder melalui queue dan scheduler
-- Laporan koleksi populer, anggota aktif, dan export laporan
-- Dokumentasi kontrak API melalui `openapi.json`
-- Frontend asset build menggunakan Vite dan Tailwind CSS
+- Autentikasi stateless menggunakan Laravel Sanctum
+- Role-based access control (RBAC) untuk Admin, Staff, dan Member
+- CRUD kategori koleksi dan katalog buku publik
+- Peminjaman dan pengembalian dengan ACID Database Transaction untuk integritas ketersediaan stok
+- Kalkulasi denda keterlambatan harian otomatis presisi
+- Endpoint analitik buku paling sering dipinjam (`/reports/popular-collections`) dan member paling aktif
+- Ekspor multi-format (PDF report stream & CSV data)
+- Queue dan scheduler untuk email reminder jatuh tempo
+- Dokumentasi kontrak API lengkap melalui `openapi.json`
 
 ## Tech Stack
 
 | Area | Teknologi |
 | --- | --- |
-| Language | PHP 8.3+ |
+| Bahasa | PHP 8.3+ |
 | Framework | Laravel 13 |
 | Database | MySQL atau MariaDB |
-| ORM | Eloquent |
-| API Authentication | Laravel Sanctum |
-| Queue | Laravel Queue |
-| Scheduler | Laravel Scheduler |
-| Frontend assets | Vite dan Tailwind CSS 4 |
+| ORM | Eloquent ORM |
+| Autentikasi API | Laravel Sanctum |
+| Antrian (Queue) | Laravel Queue |
+| Penjadwal (Scheduler) | Laravel Scheduler |
+| Laporan PDF | barryvdh/laravel-dompdf |
 | Testing | PHPUnit 12 |
-| Code style | Laravel Pint |
-| PDF report | barryvdh/laravel-dompdf |
+| Linter & Code Style | Laravel Pint |
 
 ## Prasyarat
 
@@ -78,7 +71,7 @@ copy .env.example .env
 php artisan key:generate
 ```
 
-Edit `.env` sesuai koneksi database:
+Edit `.env` sesuai konfigurasi database:
 
 ```env
 DB_CONNECTION=mysql
@@ -95,20 +88,13 @@ Jalankan migration dan seeder:
 php artisan migrate --seed
 ```
 
-Siapkan akses file upload:
+Siapkan akses penyimpanan upload:
 
 ```bash
 php artisan storage:link
 ```
 
-Install dan build asset frontend:
-
-```bash
-npm install
-npm run build
-```
-
-## Menjalankan Project
+## Menjalankan Backend
 
 Development server:
 
@@ -118,13 +104,7 @@ php artisan serve
 
 API tersedia di `http://localhost:8000`, dengan base path `/api`.
 
-Untuk development lengkap dengan queue, log, dan Vite:
-
-```bash
-composer run dev
-```
-
-Jalankan queue dan scheduler secara terpisah bila diperlukan:
+Untuk development lengkap dengan queue worker dan scheduler:
 
 ```bash
 php artisan queue:work
@@ -137,85 +117,38 @@ Testing:
 php artisan test
 ```
 
-Code style:
-
-```bash
-vendor/bin/pint
-```
-
-## Endpoint Utama
+## Endpoint Utama API
 
 Semua endpoint API menggunakan prefix `/api`.
 
-| Modul | Endpoint |
-| --- | --- |
-| Auth | `/api/auth/register`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/me` |
-| Password | `/api/auth/forgot-password`, `/api/auth/reset-password` |
-| Categories | `/api/categories`, `/api/categories/{id}` |
-| Collections | `/api/collections`, `/api/collections/{id}` |
-| Borrowings | `/api/borrowings`, `/api/borrowings/{id}/return` |
-| Fines | `/api/fines/mine`, `/api/fines`, `/api/fines/{id}/pay` |
-| Reports | `/api/reports/popular-collections`, `/api/reports/active-members`, `/api/reports/export` |
+| Modul | Endpoint | Keterangan |
+| --- | --- | --- |
+| Auth | `/api/auth/register`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/me` | Autentikasi pengguna |
+| Password | `/api/auth/forgot-password`, `/api/auth/reset-password` | Reset kata sandi |
+| Categories | `/api/categories`, `/api/categories/{id}` | Kategori buku |
+| Collections | `/api/collections`, `/api/collections/{id}` | Katalog koleksi & buku |
+| Borrowings | `/api/borrowings`, `/api/borrowings/{id}/return` | Peminjaman & pengembalian |
+| Fines | `/api/fines/mine`, `/api/fines`, `/api/fines/{id}/pay` | Kas denda keterlambatan |
+| Reports | `/api/reports/popular-collections`, `/api/reports/active-members`, `/api/reports/export` | Analitik & audit laporan |
 
-Endpoint yang dilindungi menggunakan token Sanctum:
+Header untuk endpoint terproteksi:
 
 ```text
 Authorization: Bearer <token>
 ```
 
-## Hak Akses
+## Hak Akses Pengguna
 
-| Role | Akses utama |
+| Role | Akses Utama |
 | --- | --- |
-| Admin | Akses penuh, termasuk kategori, koleksi, peminjaman, denda, dan laporan |
-| Staff | Mengelola koleksi, peminjaman, pengembalian, denda, dan laporan |
-| Member | Melihat koleksi, membuat peminjaman, melihat peminjaman dan denda sendiri |
-
-## Struktur Project
-
-```text
-app/
-  Http/Controllers/Api/   Controller endpoint API
-  Models/                 Model Eloquent
-  Services/               Business logic aplikasi
-  Mail/                   Email reminder
-  Console/                Scheduled commands
-database/
-  migrations/             Struktur tabel database
-  seeders/                Data awal aplikasi
-routes/
-  api.php                 Route REST API
-  console.php             Console dan scheduler routes
-resources/                View dan frontend assets
-public/                   Public files dan hasil build
-storage/                  Log dan uploaded files
-tests/                    Feature dan unit tests
-```
-
-## Akun Demo
-
-Seeder menyediakan akun berikut:
-
-| Role | Email | Password |
-| --- | --- | --- |
-| Admin | `admin@library.test` | `password` |
-| Staff | `staff1@library.test` | `password` |
-| Member | `member1@library.test` | `password` |
-
-Ganti password demo sebelum deployment production.
-
-## Dokumentasi API
-
-Kontrak endpoint tersedia pada file [`openapi.json`](openapi.json). Untuk melihat route yang aktif:
-
-```bash
-php artisan route:list --path=api
-```
+| **Admin** | Akses penuh: manajemen koleksi, peminjaman, denda, kategori, dan laporan audit |
+| **Staff** | Operasional sirkulasi: peminjaman kilat, verifikasi pengembalian, dan denda |
+| **Member** | Akses mandiri: melihat katalog publik, membuat peminjaman, melihat riwayat dan denda sendiri |
 
 ## Repository
 
 https://github.com/Salman-artz/library-asset-management-api
 
-## License
+## Lisensi
 
 MIT
