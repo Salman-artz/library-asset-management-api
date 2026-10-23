@@ -4,24 +4,31 @@ Backend REST API untuk sistem informasi perpustakaan institusional terpadu, meng
 
 ---
 
-## 📸 Antarmuka Sistem & Sirkulasi Pustaka
+## 📸 Antarmuka Sistem & Multi-Role Pustaka
 
 <p align="center">
-  <img src="screenshots/26_dashboard_clean_no_capsules.png" alt="Pustaka Sentral Dashboard Clean & Chart Analitik" width="94%" />
+  <img src="screenshots/40_admin_dashboard_view.png" alt="Admin Dashboard Pustaka Sentral" width="94%" />
   <br/>
-  <em>Dashboard Pustaka Sentral — Menampilkan Statistik Sirkulasi, Chart Analitik Buku Terpopuler, dan Aktivitas Meja Sirkulasi</em>
+  <em>Dashboard Administrator — Manajemen Terpadu Sirkulasi, Agregasi Kas Denda, dan Visualisasi Chart Buku Terpopuler</em>
 </p>
 
 <p align="center">
-  <img src="screenshots/07_borrowings_sirkulasi.png" alt="Sirkulasi Peminjaman dan Denda" width="94%" />
+  <img src="screenshots/41_staff_sirkulasi_view.png" alt="Meja Sirkulasi Staff" width="94%" />
   <br/>
-  <em>Manajemen Transaksi Sirkulasi Peminjaman Buku, Status Jatuh Tempo, dan Denda Otomatis Presisi</em>
+  <em>Portal Staff Sirkulasi — Pelayanan Fast Check-in/Check-out, Pelacakan Jatuh Tempo, dan Validasi Kas Denda</em>
 </p>
 
 <p align="center">
-  <img src="screenshots/12_surat_bebas_pustaka_official.png" alt="Surat Bebas Pustaka Resmi" width="94%" />
+  <img src="screenshots/42_member_portal_view.png" alt="Portal Anggota Member" width="94%" />
   <br/>
-  <em>Penerbitan Surat Keterangan Bebas Perpustakaan Resmi dengan Validasi Digital QR & Tanda Tangan</em>
+  <em>Portal Anggota (Member) — Dashboard Mandiri Mahasiswa untuk Pelacakan Riwayat Peminjaman dan Pustaka Aktif</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/38_login_light_mode.png" alt="Login Mode Terang" width="47%" />
+  <img src="screenshots/39_login_dark_mode.png" alt="Login Mode Gelap" width="47%" />
+  <br/>
+  <em>Antarmuka Autentikasi Responsif — Mode Terang (Light) & Mode Gelap (Dark) dengan Lambang Resmi Pustaka Sentral</em>
 </p>
 
 ---
