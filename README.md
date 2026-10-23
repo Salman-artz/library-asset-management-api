@@ -26,7 +26,47 @@ Backend REST API untuk sistem informasi perpustakaan institusional terpadu, meng
 
 ---
 
-## ⚡ Fitur Utama Backend
+## 🏛️ Clean Architecture (Repository-Service Pattern)
+
+Arsitektur backend dirancang mengikuti prinsip **Clean Architecture** dan **SOLID (Dependency Inversion Principle)** untuk memastikan pemisahan tanggung jawab (*separation of concerns*), kemudahan pengujian unit (*unit testing*), dan independensi basis data:
+
+```
+┌────────────────────────────────────────────────────────┐
+│  Presentation Layer (HTTP & API)                      │
+│  Controllers, FormRequests, API Resources              │
+│  (app/Http/Controllers/Api, app/Http/Requests)        │
+└───────────────────────────┬────────────────────────────┘
+                            │ (Calls)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│  Application Layer (Domain Services & Use Cases)       │
+│  AuthService, CollectionService, BorrowingService,    │
+│  FineService, CategoryService, ReportService           │
+│  (app/Services)                                       │
+└───────────────────────────┬────────────────────────────┘
+                            │ (Depends on Contracts)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│  Domain Layer (Contracts & Domain Entities)           │
+│  Repository Interfaces & Eloquent Models               │
+│  (app/Repositories/Contracts, app/Models)             │
+└───────────────────────────▲────────────────────────────┘
+                            │ (Implements via IoC)
+┌───────────────────────────┴────────────────────────────┐
+│  Infrastructure Layer (Persistence & Framework)       │
+│  Eloquent Implementations, DB Transactions, Sanctum   │
+│  (app/Repositories/Eloquent, app/Providers)           │
+└────────────────────────────────────────────────────────┘
+```
+
+### Struktur Direktori Arsitektural:
+- **`app/Http/Controllers/Api/`**: Thin controllers yang hanya menerima request, memvalidasi input via FormRequest, mendelegasikan pemrosesan ke domain service, dan mengembalikan `ApiResponse`.
+- **`app/Services/`**: Domain services yang mengisolasi business logic, manajemen transaksi ACID database, formula kalkulasi denda, dan otorisasi data.
+- **`app/Repositories/Contracts/`**: Interface kontrak domain (`CollectionRepositoryInterface`, `BorrowingRepositoryInterface`, `FineRepositoryInterface`, `CategoryRepositoryInterface`, `UserRepositoryInterface`).
+- **`app/Repositories/Eloquent/`**: Implementasi persistensi Eloquent ORM yang terikat secara otomatis di `AppServiceProvider` melalui Laravel IoC Container.
+- **`app/Models/`**: Definisi entitas model domain dan relasi basis data.
+
+---
 
 - **Autentikasi Stateless**: Menggunakan Laravel Sanctum dengan token-based authentication yang aman.
 - **Role-Based Access Control (RBAC)**: Pemisahan hak akses berjenjang untuk **Admin**, **Staff**, dan **Member**.
